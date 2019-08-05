@@ -73,7 +73,7 @@ if __name__ == '__main__':
     
     # custom args
     parser.add_argument('--input_size', type=int, default=224)
-    parser.add_argument('--batch_size', type=int, default=400)
+    parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--gpu_num', type=int, nargs='+', default=[0])
     parser.add_argument('--resnet', default=True)
