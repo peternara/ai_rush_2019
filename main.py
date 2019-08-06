@@ -13,6 +13,9 @@ from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from dataloader import train_dataloader
 from dataloader import AIRushDataset
+from cnn_finetune import make_model
+from efficientnet_pytorch import EfficientNet
+
 
 def to_np(t):
     return t.cpu().detach().numpy()
@@ -89,11 +92,8 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     device = args.device
 
-    if args.resnet:
-        assert args.input_size == 224
-        model = Resnet(args.output_size)
-    else:
-        model = Baseline(args.hidden_size, args.output_size)
+    #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=False, pool=nn.AdaptiveAvgPool2d(1))
+    model = EfficientNet.from_pretrained('efficientnet-b4', num_classes=350)
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
     criterion = nn.CrossEntropyLoss() #multi-class classification task
 
@@ -106,10 +106,13 @@ if __name__ == '__main__':
         nsml.paused(scope=locals())
     if args.mode == "train":
         # Warning: Do not load data before this line
-        dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers)
+        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers)
         for epoch_idx in range(1, args.epochs + 1):
             total_loss = 0
             total_correct = 0
+            total_valid_loss = 0
+            total_valid_correct = 0
+
             for batch_idx, (image, tags) in enumerate(dataloader):
                 optimizer.zero_grad()
                 image = image.to(device)
@@ -132,12 +135,30 @@ if __name__ == '__main__':
                                                                              accuracy))
                 total_loss += loss.item()
                 total_correct += bool_vector.sum()
+
+            ## validation
+            for batch_idx, (image, tags) in enumerate(valid_dataloader):
+                image = image.to(device)
+                tags = tags.to(device)
+                output = model(image).double()
+                loss = criterion(output, tags)
+                output_prob = F.softmax(output, dim=1)
+                predict_vector = np.argmax(to_np(output_prob), axis=1)
+                label_vector = to_np(tags)
+                bool_vector = predict_vector == label_vector
+                accuracy = bool_vector.sum() / len(bool_vector)
+                total_valid_loss += loss.item()
+                total_valid_correct += bool_vector.sum()
+
+
                     
             nsml.save(epoch_idx)
-            print('Epoch {} / {}: Loss {:2.4f} / Epoch Acc {:2.4f}'.format(epoch_idx,
+            print('Epoch {} / {}: Loss {:2.4f} / Acc {:2.4f}, Valid_Loss {:2.4f} / Valid_Acc {:2.4f}'.format(epoch_idx,
                                                            args.epochs,
                                                            total_loss/len(dataloader.dataset),
-                                                           total_correct/len(dataloader.dataset)))
+                                                           total_correct/len(dataloader.dataset),
+                                                           total_valid_loss/len(valid_dataloader.dataset),
+                                                           total_valid_correct/len(valid_dataloader.dataset)))
             nsml.report(
                 summary=True,
                 step=epoch_idx,
@@ -145,4 +166,6 @@ if __name__ == '__main__':
                 **{
                 "train__Loss": total_loss/len(dataloader.dataset),
                 "train__Accuracy": total_correct/len(dataloader.dataset),
+                "valid__Loss": total_valid_loss/len(valid_dataloader.dataset),
+                "valid__Accuracy": total_valid_correct/len(valid_dataloader.dataset),
                 })

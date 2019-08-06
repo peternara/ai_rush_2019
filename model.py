@@ -39,4 +39,3 @@ class Resnet(nn.Module):
 
     def forward(self, image):
         return self.net(image).squeeze(-1).squeeze(-1)
-

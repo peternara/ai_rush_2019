@@ -9,6 +9,8 @@ from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from nsml import DATASET_PATH
+from skmultilearn.model_selection import iterative_train_test_split
+from sklearn.model_selection import train_test_split
 
 def train_dataloader(input_size=128,
                     batch_size=64,
@@ -19,15 +21,29 @@ def train_dataloader(input_size=128,
     train_label_path = os.path.join(DATASET_PATH, 'train', 'train_label') 
     train_meta_path = os.path.join(DATASET_PATH, 'train', 'train_data', 'train_with_valid_tags.csv')
     train_meta_data = pd.read_csv(train_meta_path, delimiter=',', header=0)
-        
+    print("total train meta data shape : ", train_meta_data.shape)
+    print(train_meta_data.head(10))
+
+    train_df, valid_df  = train_test_split(train_meta_data, test_size=0.1, random_state=777)
+    print("train :", train_df.shape, "valid_df", valid_df.shape)
+    #X_train, y_train, X_test, y_test = iterative_train_test_split(X, y, test_size = 0.2)
+
     dataloader = DataLoader(
-        AIRushDataset(image_dir, train_meta_data, label_path=train_label_path, 
+        AIRushDataset(image_dir, train_df, label_path=train_label_path, 
                       transform=transforms.Compose([transforms.Resize((input_size, input_size)), transforms.ToTensor()])),
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True)
-    return dataloader
+
+    valid_dataloader = DataLoader(
+        AIRushDataset(image_dir, valid_df, label_path=train_label_path, 
+                      transform=transforms.Compose([transforms.Resize((input_size, input_size)), transforms.ToTensor()])),
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True)
+    return dataloader, valid_dataloader
 
 
 class AIRushDataset(Dataset):

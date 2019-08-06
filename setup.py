@@ -10,6 +10,9 @@ setup(
             'pickle-mixin',
             'torchvision',
             'pandas',
+            'scikit-multilearn',
+            'cnn_finetune',
+            'efficientnet-pytorch'
 
     ]
 )
