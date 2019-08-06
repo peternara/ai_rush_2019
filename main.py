@@ -93,9 +93,9 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     device = args.device
 
-    model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
+    #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
     #model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
-    #model = EfficientNet.from_pretrained('efficientnet-b3', num_classes=args.output_size)
+    model = EfficientNet.from_pretrained('efficientnet-b3', num_classes=args.output_size)
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
     criterion = nn.CrossEntropyLoss() #multi-class classification task
 
