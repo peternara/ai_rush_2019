@@ -25,7 +25,12 @@ def train_dataloader(input_size=128,
     print(train_meta_data.head(10))
 
     train_df, valid_df  = train_test_split(train_meta_data, test_size=0.1, random_state=777)
+    
+    #train_df = train_df.head(100)
+    #valid_df = valid_df.head(100)
+    
     print("train :", train_df.shape, "valid_df", valid_df.shape)
+    print("batch_size : ", batch_size)
     #X_train, y_train, X_test, y_test = iterative_train_test_split(X, y, test_size = 0.2)
 
     dataloader = DataLoader(

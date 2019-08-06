@@ -16,6 +16,7 @@ from dataloader import AIRushDataset
 from cnn_finetune import make_model
 from efficientnet_pytorch import EfficientNet
 
+_BATCH_SIZE = 80
 
 def to_np(t):
     return t.cpu().detach().numpy()
@@ -38,7 +39,7 @@ def bind_model(model_nsml):
         test_meta_data = pd.read_csv(test_meta_data_path, delimiter=',', header=0)
         
         input_size=224 # you can change this according to your model.
-        batch_size=200 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
+        batch_size=_BATCH_SIZE*2 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
         device = 0
         
         dataloader = DataLoader(
@@ -76,7 +77,7 @@ if __name__ == '__main__':
     
     # custom args
     parser.add_argument('--input_size', type=int, default=224)
-    parser.add_argument('--batch_size', type=int, default=100)
+    parser.add_argument('--batch_size', type=int, default=_BATCH_SIZE)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--gpu_num', type=int, nargs='+', default=[0])
     parser.add_argument('--resnet', default=True)
@@ -84,7 +85,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_size', type=int, default=350) # Fixed
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--log_interval', type=int, default=100)
-    parser.add_argument('--learning_rate', type=float, default=2.5e-4)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
@@ -92,8 +93,9 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     device = args.device
 
-    #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=False, pool=nn.AdaptiveAvgPool2d(1))
-    model = EfficientNet.from_pretrained('efficientnet-b4', num_classes=350)
+    model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
+    #model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
+    #model = EfficientNet.from_pretrained('efficientnet-b3', num_classes=args.output_size)
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
     criterion = nn.CrossEntropyLoss() #multi-class classification task
 
