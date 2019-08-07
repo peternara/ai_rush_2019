@@ -9,11 +9,12 @@ setup(
             'torch>=1.0',
             'pickle-mixin',
             'torchvision',
-            'pandas',
+            'pandas>=0.24.0',
             #'scikit-multilearn',
             'cnn_finetune',
             'efficientnet-pytorch',
             'torchsummary',
+            #'Pillow'
             #'iterative-stratification'
 
     ]

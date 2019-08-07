@@ -17,6 +17,7 @@ from cnn_finetune import make_model
 from efficientnet_pytorch import EfficientNet
 from torchsummary import summary
 
+
 _BATCH_SIZE = 80
 
 def to_np(t):
@@ -86,7 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_size', type=int, default=350) # Fixed
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--log_interval', type=int, default=100)
-    parser.add_argument('--learning_rate', type=float, default=0.002)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
@@ -94,13 +95,13 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     device = args.device
 
-    #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
-    #model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))
+    #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))#80
+    model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))#80
     #model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=args.output_size)
-    model = Resnet(args.output_size)
+    #model = Resnet(args.output_size)
 
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
-    criterion = nn.BCEWithLogitsLoss()#CrossEntropyLoss() #multi-class classification task
+    criterion = nn.CrossEntropyLoss()#nn.BCEWithLogitsLoss()#CrossEntropyLoss() #multi-class classification task
 
     model = model.to(device)
     #summary(model, (3,args.input_size,args.input_size))
@@ -131,7 +132,7 @@ if __name__ == '__main__':
                 output_prob = F.softmax(output, dim=1)
                 predict_vector = np.argmax(to_np(output_prob), axis=1)
                 label_vector = to_np(tags)
-                bool_vector = predict_vector == np.argmax(label_vector, axis=1)
+                bool_vector = predict_vector == label_vector
                 accuracy = bool_vector.sum() / len(bool_vector)
 
                 if batch_idx % args.log_interval == 0:
@@ -152,7 +153,7 @@ if __name__ == '__main__':
                 output_prob = F.softmax(output, dim=1)
                 predict_vector = np.argmax(to_np(output_prob), axis=1)
                 label_vector = to_np(tags)
-                bool_vector = predict_vector == np.argmax(label_vector, axis=1)
+                bool_vector = predict_vector == label_vector
                 accuracy = bool_vector.sum() / len(bool_vector)
                 total_valid_loss += loss.item()
                 total_valid_correct += bool_vector.sum()
