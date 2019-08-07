@@ -6,13 +6,14 @@ setup(
     version='1.0',
     install_requires=[
             'tqdm',
-            'torch>=1.1',
+            'torch>=1.0',
             'pickle-mixin',
             'torchvision',
             'pandas',
             #'scikit-multilearn',
             'cnn_finetune',
             'efficientnet-pytorch',
+            'torchsummary',
             #'iterative-stratification'
 
     ]

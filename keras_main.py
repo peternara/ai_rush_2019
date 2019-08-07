@@ -1,50 +1,58 @@
 import os
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 import numpy as np
 import argparse
 import pathlib
 from model import Baseline, Resnet
 import nsml
 import pandas as pd
-from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
 from dataloader import train_dataloader
 from dataloader import AIRushDataset
-from cnn_finetune import make_model
-from efficientnet_pytorch import EfficientNet
-from torchsummary import summary
+import keras
+from keras.models import Sequential
+from keras.layers import Concatenate
+from keras.layers import Dense, Dropout, Flatten, Activation,Average
+from keras.layers import Conv2D, MaxPooling2D, GlobalAveragePooling2D, BatchNormalization,Input
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint
+from keras import backend as K
+from keras.applications.xception import Xception
+from keras.applications.densenet import DenseNet121, DenseNet169, DenseNet201
+from keras.applications.nasnet import NASNetMobile
+from keras.applications.resnet50 import ResNet50
+from keras.applications.nasnet import NASNetLarge
+from keras.applications.mobilenetv2 import MobileNetV2
+from keras.applications.inception_resnet_v2 import InceptionResNetV2
+from keras.models import Model,load_model
+from keras.optimizers import Adam, SGD
+from keras import Model, Input
+from keras.layers import Layer
 
-_BATCH_SIZE = 80
+from sklearn.model_selection import train_test_split
+import imgaug as ia
+from imgaug import augmenters as iaa
+import random
 
-def to_np(t):
-    return t.cpu().detach().numpy()
+_BATCH_SIZE = 200
 
-def bind_model(model_nsml):
+def bind_model(model):
     def save(dir_name, **kwargs):
-        save_state_path = os.path.join(dir_name, 'state_dict.pkl')
-        state = {
-                    'model': model_nsml.state_dict(),
-                }
-        torch.save(state, save_state_path)
+        os.makedirs(dir_name, exist_ok=True)
+        model.save_weights(os.path.join(dir_name, 'model'))
+        print('model saved!', os.path.join(dir_name, 'model'))
 
     def load(dir_name):
-        save_state_path = os.path.join(dir_name, 'state_dict.pkl')
-        state = torch.load(save_state_path)
-        model_nsml.load_state_dict(state['model'])
+        model.load_weights(file_path)
+        print('model loaded!', file_path)
         
     def infer(test_image_data_path, test_meta_data_path):
         # DONOTCHANGE This Line
         test_meta_data = pd.read_csv(test_meta_data_path, delimiter=',', header=0)
         
         input_size=224 # you can change this according to your model.
-        batch_size=_BATCH_SIZE # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
+        batch_size=_BATCH_SIZE*2 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
         device = 0
         
         dataloader = DataLoader(
-                        AIRushDataset(test_image_data_path, test_meta_data, label=None,
+                        AIRushDataset(test_image_data_path, test_meta_data, label_path=None,
                                       transform=transforms.Compose([transforms.Resize((input_size, input_size)), transforms.ToTensor()])),
                         batch_size=batch_size,
                         shuffle=False,
@@ -86,7 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_size', type=int, default=350) # Fixed
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--log_interval', type=int, default=100)
-    parser.add_argument('--learning_rate', type=float, default=0.002)
+    parser.add_argument('--learning_rate', type=float, default=0.0002)
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
@@ -100,7 +108,7 @@ if __name__ == '__main__':
     model = Resnet(args.output_size)
 
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
-    criterion = nn.BCEWithLogitsLoss()#CrossEntropyLoss() #multi-class classification task
+    criterion = nn.CrossEntropyLoss()#CrossEntropyLoss() #multi-class classification task
 
     model = model.to(device)
     #summary(model, (3,args.input_size,args.input_size))
@@ -119,19 +127,16 @@ if __name__ == '__main__':
             model.train()
             for batch_idx, (image, tags) in enumerate(dataloader):
                 optimizer.zero_grad()
-                #print('image.shape',image.shape,'tags.shape',tags.shape)
                 image = image.to(device)
                 tags = tags.to(device)
                 output = model(image).double()
-                #print('output.shape',output.shape)
                 loss = criterion(output, tags)
                 loss.backward()
                 optimizer.step()
-
                 output_prob = F.softmax(output, dim=1)
                 predict_vector = np.argmax(to_np(output_prob), axis=1)
                 label_vector = to_np(tags)
-                bool_vector = predict_vector == np.argmax(label_vector, axis=1)
+                bool_vector = predict_vector == label_vector
                 accuracy = bool_vector.sum() / len(bool_vector)
 
                 if batch_idx % args.log_interval == 0:
@@ -152,7 +157,7 @@ if __name__ == '__main__':
                 output_prob = F.softmax(output, dim=1)
                 predict_vector = np.argmax(to_np(output_prob), axis=1)
                 label_vector = to_np(tags)
-                bool_vector = predict_vector == np.argmax(label_vector, axis=1)
+                bool_vector = predict_vector == label_vector
                 accuracy = bool_vector.sum() / len(bool_vector)
                 total_valid_loss += loss.item()
                 total_valid_correct += bool_vector.sum()
