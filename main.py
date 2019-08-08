@@ -18,7 +18,7 @@ from efficientnet_pytorch import EfficientNet
 from torchsummary import summary
 
 
-_BATCH_SIZE = 80
+_BATCH_SIZE = 120
 
 def to_np(t):
     return t.cpu().detach().numpy()
@@ -95,13 +95,21 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     device = args.device
 
+
+    test_bs = False
+    use_pretrained = True
+    if test_bs == True:
+        use_pretrained = False
+
     #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))#80
-    model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))#80
+    #model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=use_pretrained, pool=nn.AdaptiveAvgPool2d(1))#70
+    model = make_model('nasnetamobile', num_classes=args.output_size, pretrained=use_pretrained, pool=nn.AdaptiveAvgPool2d(1))#100
     #model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=args.output_size)
-    #model = Resnet(args.output_size)
+    #model = Resnet(args.output_size)#180
 
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
     criterion = nn.CrossEntropyLoss()#nn.BCEWithLogitsLoss()#CrossEntropyLoss() #multi-class classification task
+    criterion1 = nn.BCEWithLogitsLoss()
 
     model = model.to(device)
     #summary(model, (3,args.input_size,args.input_size))
@@ -111,7 +119,7 @@ if __name__ == '__main__':
         nsml.paused(scope=locals())
     if args.mode == "train":
         # Warning: Do not load data before this line
-        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers)
+        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs)
         for epoch_idx in range(1, args.epochs + 1):
             total_loss = 0
             total_correct = 0

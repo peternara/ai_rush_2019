@@ -37,7 +37,7 @@ def data_generator_for_keras(input_size=128,
 def train_dataloader(input_size=128,
                     batch_size=64,
                     num_workers=0,
-                    use_only_single = False):
+                    use_only_single = False, test_bs = False):
     
     image_dir = os.path.join(DATASET_PATH, 'train', 'train_data', 'images') 
     train_label_path = os.path.join(DATASET_PATH, 'train', 'train_label') 
@@ -90,6 +90,11 @@ def train_dataloader(input_size=128,
 
     print("batch_size : ", batch_size)
 
+    if test_bs ==True:
+        train_df = train_df.head(batch_size)
+        valid_df = valid_df.head(batch_size)
+        train_label = train_label[:batch_size]
+        valid_label = valid_label[:batch_size]
 
 
     dataloader = DataLoader(
