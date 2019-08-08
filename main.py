@@ -19,10 +19,26 @@ from torchsummary import summary
 
 
 # hyper param setting
-_BATCH_SIZE = 120
-use_train_time_multi_calss_info_add = True
-test_bs = False # search batch size when debugging 
-use_pretrained = True
+use_train_time_multi_calss_info_add = True  # default is True
+test_bs = False # search batch size when debugging , default is False
+use_pretrained = True # test model, no download , default is True
+
+re_train_info =  None #{'session':'Zonber/ir_ph2/314', 'checkpoint':'0'} # = None
+if re_train_info is not None:
+    use_pretrained = False
+
+#        nsml.load(checkpoint='secls_222_27', session='Zonber/ir_ph2/314') #InceptionResnetV2 222
+pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':80}  #0
+                          ,{'model':'inceptionresnetv2', 'batch_size':70} #1
+                          ,{'model':'nasnetamobile', 'batch_size':200} #2
+                          ,{'model':'efficientnet-b0', 'batch_size':80}] 
+select_model_num = 2
+_BATCH_SIZE = pre_trained_model_list[select_model_num]['batch_size']
+model_name = pre_trained_model_list[select_model_num]['model']
+
+
+mean_v = [0.8674, 0.8422, 0.8218]
+std_v = [0.2407, 0.2601, 0.2791]
 
 
 def to_np(t):
@@ -55,7 +71,10 @@ def bind_model(model_nsml):
         
         dataloader = DataLoader(
                         AIRushDataset(test_image_data_path, test_meta_data, label=None,
-                                      transform=transforms.Compose([transforms.Resize((input_size, input_size)), transforms.ToTensor()])),
+                                      transform=transforms.Compose([transforms.Resize((input_size, input_size))
+                                                                    , transforms.ToTensor()
+                                                                    ,transforms.Normalize(mean=mean_v, std=std_v)
+                                                                    ])),
                         batch_size=batch_size,
                         shuffle=False,
                         num_workers=0,
@@ -91,8 +110,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=_BATCH_SIZE)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--gpu_num', type=int, nargs='+', default=[0])
-    #parser.add_argument('--resnet', default=True)
-    #parser.add_argument('--hidden_size', type=int, default=256)
     parser.add_argument('--output_size', type=int, default=350) # Fixed
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--log_interval', type=int, default=100)
@@ -108,17 +125,16 @@ if __name__ == '__main__':
     if test_bs == True:
         use_pretrained = False
 
-    #model = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=True, pool=nn.AdaptiveAvgPool2d(1))#80
-    #model = make_model('inceptionresnetv2', num_classes=args.output_size, pretrained=use_pretrained, pool=nn.AdaptiveAvgPool2d(1))#70
-    model = make_model('nasnetamobile', num_classes=args.output_size, pretrained=use_pretrained, pool=nn.AdaptiveAvgPool2d(1))#100
-    #model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=args.output_size)
-    #model = Resnet(args.output_size)#180
+    if model_name.split('-')[0]=='efficientnet':
+        model = EfficientNet.from_pretrained(model_name, num_classes=args.output_size)
+    else:
+        model = make_model(model_name, num_classes=args.output_size, pretrained=use_pretrained, pool=nn.AdaptiveAvgPool2d(1))
 
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
     criterion = nn.CrossEntropyLoss()#nn.BCEWithLogitsLoss()#CrossEntropyLoss() #multi-class classification task
     criterion1 = nn.BCEWithLogitsLoss()
 
-    model = model.to(device)
+    model = model.to(device) #use gpu
     #summary(model, (3,args.input_size,args.input_size))
     # DONOTCHANGE: They are reserved for nsml
     bind_model(model)
@@ -126,25 +142,27 @@ if __name__ == '__main__':
         nsml.paused(scope=locals())
     if args.mode == "train":
         # Warning: Do not load data before this line
-        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs, br_multi_oh=use_train_time_multi_calss_info_add)
+        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs
+                                                        , br_multi_oh=use_train_time_multi_calss_info_add#)
+                                                        ,print_nor_info = False)
         for epoch_idx in range(1, args.epochs + 1):
             total_loss = 0
             total_correct = 0
             total_valid_loss = 0
             total_valid_correct = 0
             model.train()
-
-
             for batch_idx, (image, tags) in enumerate(dataloader):
                 optimizer.zero_grad()
                 #print('image.shape',image.shape,'tags.shape',tags.shape)
                 image = image.to(device)
 
-                tags = tags.to(device)
+
                 
                 if use_train_time_multi_calss_info_add ==True:
                     tags_m = tags[1].to(device)
                     tags = tags[0].to(device)
+                else:
+                    tags = tags.to(device)
 
 
                 output = model(image).double()

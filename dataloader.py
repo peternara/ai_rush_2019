@@ -28,16 +28,14 @@ def data_generator_for_keras(input_size=128,
 #    msss = MultilabelStratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=777)
     train_df, valid_df  = train_test_split(train_meta_data, test_size=0.1, random_state=777)
     print("train data shape : ", train_df.shape)
-    printI(train_df.head(5))
+    print(train_df.head(5))
     print("valid data shape : ", valid_df.shape)
-    printI(valid_df.head(5))
-
-
+    print(valid_df.head(5))
 
 def train_dataloader(input_size=128,
                     batch_size=64,
                     num_workers=0,
-                    use_only_single = False, test_bs = False, br_multi_oh= False):
+                    use_only_single = False, test_bs = False, br_multi_oh= False, print_nor_info = False):
     
     image_dir = os.path.join(DATASET_PATH, 'train', 'train_data', 'images') 
     train_label_path = os.path.join(DATASET_PATH, 'train', 'train_label') 
@@ -49,7 +47,7 @@ def train_dataloader(input_size=128,
     label_matrix = np.load(train_label_path)
     print("label_matrix shape : ", label_matrix.shape)
     class_count = label_matrix.sum(axis=0)
-    print('class_count',class_count)
+    print('class_count only disp top 10 : ',class_count[:10])
     single_list = []
     for i in range(label_matrix.shape[0]):
         if label_matrix[i,:].sum() == 1:
@@ -57,6 +55,9 @@ def train_dataloader(input_size=128,
     print('single_list count',len(single_list))
 
     #print('single_list',single_list)single_list count 205173
+    # mean tensor([0.8674, 0.8422, 0.8218]) std tensor([0.2407, 0.2601, 0.2791])
+    mean_v = [0.8674, 0.8422, 0.8218]
+    std_v = [0.2407, 0.2601, 0.2791]
 
     data_seed = 777
     if use_only_single == True:
@@ -104,6 +105,7 @@ def train_dataloader(input_size=128,
                                                     , transforms.RandomHorizontalFlip()
                                                     ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR)
                                                     , transforms.ToTensor()
+                                                    ,transforms.Normalize(mean=mean_v, std=std_v)
                                                     ])),
         batch_size=batch_size,
         shuffle=True,
@@ -112,8 +114,10 @@ def train_dataloader(input_size=128,
 
     valid_dataloader = DataLoader(
         AIRushDataset(image_dir, valid_df, label=valid_label, 
-                      transform=transforms.Compose([transforms.Resize((input_size, input_size)), transforms.ToTensor()])),
-        batch_size=batch_size,
+                      transform=transforms.Compose([transforms.Resize((input_size, input_size))
+                                                    , transforms.ToTensor()
+                                                    ,transforms.Normalize(mean=mean_v, std=std_v)])),
+        batch_size=batch_size//10,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True)
@@ -163,3 +167,31 @@ class AIRushDataset(Dataset):
             return new_img, tags
         else:
             return new_img
+
+
+
+
+
+
+
+    #if print_nor_info == True: # mean tensor([0.8674, 0.8422, 0.8218]) std tensor([0.2407, 0.2601, 0.2791])
+    #    cal_dataloader = DataLoader(
+    #        AIRushDataset(image_dir, train_meta_data, label=None, 
+    #                      transform=transforms.Compose([transforms.Resize((input_size, input_size)), transforms.ToTensor()])),
+    #        batch_size=batch_size,
+    #        shuffle=False,
+    #        num_workers=1)
+    #    mean = 0.
+    #    std = 0.
+    #    nb_samples = 0.
+    #    for data in cal_dataloader:
+    #        batch_samples = data.shape[0]#(0)
+    #        data = data.view(batch_samples, data.size(1), -1)
+    #        mean += data.mean(2).sum(0)
+    #        std += data.std(2).sum(0)
+    #        nb_samples += batch_samples
+    #        #print('process imgs', nb_samples)
+
+    #    mean /= nb_samples
+    #    std /= nb_samples
+    #    print('mean',mean, 'std', std)
