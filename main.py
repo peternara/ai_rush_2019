@@ -18,10 +18,19 @@ from efficientnet_pytorch import EfficientNet
 from torchsummary import summary
 
 
+# hyper param setting
 _BATCH_SIZE = 120
+use_train_time_multi_calss_info_add = True
+test_bs = False # search batch size when debugging 
+use_pretrained = True
+
 
 def to_np(t):
     return t.cpu().detach().numpy()
+
+def to_categorical(y, num_classes):
+    """ 1-hot encodes a tensor """
+    return np.eye(num_classes, dtype='uint8')[y]
 
 def bind_model(model_nsml):
     def save(dir_name, **kwargs):
@@ -96,8 +105,6 @@ if __name__ == '__main__':
     device = args.device
 
 
-    test_bs = False
-    use_pretrained = True
     if test_bs == True:
         use_pretrained = False
 
@@ -119,21 +126,30 @@ if __name__ == '__main__':
         nsml.paused(scope=locals())
     if args.mode == "train":
         # Warning: Do not load data before this line
-        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs)
+        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs, br_multi_oh=use_train_time_multi_calss_info_add)
         for epoch_idx in range(1, args.epochs + 1):
             total_loss = 0
             total_correct = 0
             total_valid_loss = 0
             total_valid_correct = 0
             model.train()
+
+
             for batch_idx, (image, tags) in enumerate(dataloader):
                 optimizer.zero_grad()
                 #print('image.shape',image.shape,'tags.shape',tags.shape)
                 image = image.to(device)
+
                 tags = tags.to(device)
+                
+                if use_train_time_multi_calss_info_add ==True:
+                    tags_m = tags[1].to(device)
+                    tags = tags[0].to(device)
+
+
                 output = model(image).double()
                 #print('output.shape',output.shape)
-                loss = criterion(output, tags)
+                loss = criterion(output, tags) + criterion1(output, tags_m) #train time support
                 loss.backward()
                 optimizer.step()
 

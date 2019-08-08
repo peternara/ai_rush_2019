@@ -37,7 +37,7 @@ def data_generator_for_keras(input_size=128,
 def train_dataloader(input_size=128,
                     batch_size=64,
                     num_workers=0,
-                    use_only_single = False, test_bs = False):
+                    use_only_single = False, test_bs = False, br_multi_oh= False):
     
     image_dir = os.path.join(DATASET_PATH, 'train', 'train_data', 'images') 
     train_label_path = os.path.join(DATASET_PATH, 'train', 'train_label') 
@@ -98,7 +98,7 @@ def train_dataloader(input_size=128,
 
 
     dataloader = DataLoader(
-        AIRushDataset(image_dir, train_df, label=train_label, 
+        AIRushDataset(image_dir, train_df, label=train_label, br_multi_oh =br_multi_oh,
                       transform=transforms.Compose([transforms.Resize((int(input_size*1.1),int( input_size*1.1)))
                                                     ,transforms.RandomCrop((input_size, input_size), padding_mode='symmetric')
                                                     , transforms.RandomHorizontalFlip()
@@ -121,13 +121,13 @@ def train_dataloader(input_size=128,
 
 
 class AIRushDataset(Dataset):
-    def __init__(self, image_data_path, meta_data,label=None, transform=None, use_multi=False):
+    def __init__(self, image_data_path, meta_data,label=None, transform=None, use_multi=False, br_multi_oh=False):
         self.meta_data = meta_data
         self.image_dir = image_data_path
         self.label = label
         self.transform = transform
         self.use_multi = use_multi
-
+        self.br_multi_oh = br_multi_oh
         if self.label is not None:
             self.label_matrix = label
 
@@ -148,6 +148,14 @@ class AIRushDataset(Dataset):
         #print('new_img.mean',new_img.mean(),'new_img.std', new_img.std())
         
         if self.label is not None:
+            if self.br_multi_oh == True:
+                tags_single = torch.tensor(np.argmax(self.label_matrix[idx])) 
+                tags_multi = torch.tensor((self.label_matrix[idx]))
+                tagss = []
+                tagss.append(tags_single)
+                tagss.append(tags_multi)
+                return new_img, tagss         
+
             if self.use_multi == True:
                 tags = torch.tensor((self.label_matrix[idx]))
             else :
