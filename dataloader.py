@@ -56,8 +56,8 @@ def train_dataloader(input_size=128,
 
     #print('single_list',single_list)single_list count 205173
     # mean tensor([0.8674, 0.8422, 0.8218]) std tensor([0.2407, 0.2601, 0.2791])
-    mean_v = [0.8674, 0.8422, 0.8218]
-    std_v = [0.2407, 0.2601, 0.2791]
+    #mean_v = [0.8674, 0.8422, 0.8218]
+    #std_v = [0.2407, 0.2601, 0.2791]
 
     data_seed = 777
     if use_only_single == True:
@@ -105,7 +105,7 @@ def train_dataloader(input_size=128,
                                                     , transforms.RandomHorizontalFlip()
                                                     ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR)
                                                     , transforms.ToTensor()
-                                                    ,transforms.Normalize(mean=mean_v, std=std_v)
+                                                    #,transforms.Normalize(mean=mean_v, std=std_v)
                                                     ])),
         batch_size=batch_size,
         shuffle=True,
@@ -116,7 +116,8 @@ def train_dataloader(input_size=128,
         AIRushDataset(image_dir, valid_df, label=valid_label, 
                       transform=transforms.Compose([transforms.Resize((input_size, input_size))
                                                     , transforms.ToTensor()
-                                                    ,transforms.Normalize(mean=mean_v, std=std_v)])),
+                                                    #,transforms.Normalize(mean=mean_v, std=std_v)
+                                                    ])),
         batch_size=batch_size//10,
         shuffle=False,
         num_workers=num_workers,

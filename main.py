@@ -23,16 +23,21 @@ use_train_time_multi_calss_info_add = True  # default is True
 test_bs = False # search batch size when debugging , default is False
 use_pretrained = True # test model, no download , default is True
 
-re_train_info =  None #{'session':'Zonber/ir_ph2/314', 'checkpoint':'0'} # = None
+re_train_info = None
+# {'session':'team_27/airush1/262', 'checkpoint':'1'} # = None   #se_resnext50_32x4d
+
+
 if re_train_info is not None:
     use_pretrained = False
 
-#        nsml.load(checkpoint='secls_222_27', session='Zonber/ir_ph2/314') #InceptionResnetV2 222
-pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':80}  #0
-                          ,{'model':'inceptionresnetv2', 'batch_size':70} #1
+down_lr_step = 3
+start_lr = 0.001
+
+pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':160}  #0
+                          ,{'model':'inceptionresnetv2', 'batch_size':130} #1
                           ,{'model':'nasnetamobile', 'batch_size':200} #2
-                          ,{'model':'efficientnet-b0', 'batch_size':80}] 
-select_model_num = 2
+                          ,{'model':'efficientnet-b4', 'batch_size':70}] 
+select_model_num = 3
 _BATCH_SIZE = pre_trained_model_list[select_model_num]['batch_size']
 model_name = pre_trained_model_list[select_model_num]['model']
 
@@ -66,14 +71,15 @@ def bind_model(model_nsml):
         test_meta_data = pd.read_csv(test_meta_data_path, delimiter=',', header=0)
         
         input_size=224 # you can change this according to your model.
-        batch_size=_BATCH_SIZE # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
+        batch_size=_BATCH_SIZE//2 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
+        # test time gpu memory error, so i reduce batch size when test time
         device = 0
         
         dataloader = DataLoader(
                         AIRushDataset(test_image_data_path, test_meta_data, label=None,
                                       transform=transforms.Compose([transforms.Resize((input_size, input_size))
                                                                     , transforms.ToTensor()
-                                                                    ,transforms.Normalize(mean=mean_v, std=std_v)
+                                                                    #,transforms.Normalize(mean=mean_v, std=std_v)
                                                                     ])),
                         batch_size=batch_size,
                         shuffle=False,
@@ -113,7 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_size', type=int, default=350) # Fixed
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--log_interval', type=int, default=100)
-    parser.add_argument('--learning_rate', type=float, default=0.001)
+    parser.add_argument('--learning_rate', type=float, default=start_lr)
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
@@ -126,9 +132,13 @@ if __name__ == '__main__':
         use_pretrained = False
 
     if model_name.split('-')[0]=='efficientnet':
-        model = EfficientNet.from_pretrained(model_name, num_classes=args.output_size)
+        if use_pretrained ==True:
+            model = EfficientNet.from_pretrained(model_name, num_classes=args.output_size)
+        else:
+            model = model = EfficientNet.from_name(model_name, override_params={'num_classes': args.output_size})
     else:
         model = make_model(model_name, num_classes=args.output_size, pretrained=use_pretrained, pool=nn.AdaptiveAvgPool2d(1))
+
 
     optimizer = optim.Adam(model.parameters(), args.learning_rate)
     criterion = nn.CrossEntropyLoss()#nn.BCEWithLogitsLoss()#CrossEntropyLoss() #multi-class classification task
@@ -138,6 +148,13 @@ if __name__ == '__main__':
     #summary(model, (3,args.input_size,args.input_size))
     # DONOTCHANGE: They are reserved for nsml
     bind_model(model)
+
+    if re_train_info is not None and args.mode == "train":
+        print(re_train_info)
+        nsml.load(checkpoint=re_train_info['checkpoint'], session=re_train_info['session']) 
+        nsml.save('dontgiveup')
+
+
     if args.pause:
         nsml.paused(scope=locals())
     if args.mode == "train":
@@ -145,11 +162,19 @@ if __name__ == '__main__':
         dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs
                                                         , br_multi_oh=use_train_time_multi_calss_info_add#)
                                                         ,print_nor_info = False)
+
+
+        scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer,	
+                              step_size=down_lr_step,	
+                              gamma=0.5)
+
         for epoch_idx in range(1, args.epochs + 1):
             total_loss = 0
             total_correct = 0
             total_valid_loss = 0
             total_valid_correct = 0
+            scheduler.step()
+            print('Epoch:', epoch_idx,'LR:', scheduler.get_lr())
             model.train()
             for batch_idx, (image, tags) in enumerate(dataloader):
                 optimizer.zero_grad()
