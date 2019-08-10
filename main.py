@@ -23,7 +23,7 @@ use_train_time_multi_calss_info_add = True  # default is True
 test_bs = False # search batch size when debugging , default is False
 use_pretrained = True # test model, no download , default is True
 
-re_train_info = None
+re_train_info = {'session':'team_27/airush1/281', 'checkpoint':'9'}  #= None
 # {'session':'team_27/airush1/262', 'checkpoint':'1'} # = None   #se_resnext50_32x4d
 
 
@@ -71,7 +71,7 @@ def bind_model(model_nsml):
         test_meta_data = pd.read_csv(test_meta_data_path, delimiter=',', header=0)
         
         input_size=224 # you can change this according to your model.
-        batch_size=_BATCH_SIZE//2 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
+        batch_size=_BATCH_SIZE//4 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
         # test time gpu memory error, so i reduce batch size when test time
         device = 0
         
@@ -91,10 +91,15 @@ def bind_model(model_nsml):
         predict_list = []
         for batch_idx, image in enumerate(dataloader):
             image = image.to(device)
-            output = model_nsml(image).double()
-            
+            image_lr = image.flip(3) #batch, ch, h, w
+
+            output_org = model_nsml(image).double()
+            output_lr = model_nsml(image_lr).double()
+            output = output_org + output_lr
+
             output_prob = F.softmax(output, dim=1)
             predict = np.argmax(to_np(output_prob), axis=1)
+
             predict_list.append(predict)
                 
         predict_vector = np.concatenate(predict_list, axis=0)
@@ -179,10 +184,7 @@ if __name__ == '__main__':
             for batch_idx, (image, tags) in enumerate(dataloader):
                 optimizer.zero_grad()
                 #print('image.shape',image.shape,'tags.shape',tags.shape)
-                image = image.to(device)
-
-
-                
+                image = image.to(device)                
                 if use_train_time_multi_calss_info_add ==True:
                     tags_m = tags[1].to(device)
                     tags = tags[0].to(device)
@@ -214,6 +216,7 @@ if __name__ == '__main__':
             model.eval()
             for batch_idx, (image, tags) in enumerate(valid_dataloader):
                 image = image.to(device)
+
                 tags = tags.to(device)
                 output = model(image).double()
                 loss = criterion(output, tags)

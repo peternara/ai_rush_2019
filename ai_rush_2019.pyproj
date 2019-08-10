@@ -30,9 +30,11 @@
     <Compile Include="main.py" />
     <Compile Include="model.py" />
     <Compile Include="setup.py" />
+    <Compile Include="submit.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".nsmlignore" />
+    <Content Include="submit_list_cand.csv" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

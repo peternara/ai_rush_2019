@@ -100,10 +100,10 @@ def train_dataloader(input_size=128,
 
     dataloader = DataLoader(
         AIRushDataset(image_dir, train_df, label=train_label, br_multi_oh =br_multi_oh,
-                      transform=transforms.Compose([transforms.Resize((int(input_size*1.1),int( input_size*1.1)))
-                                                    ,transforms.RandomCrop((input_size, input_size), padding_mode='symmetric')
-                                                    , transforms.RandomHorizontalFlip()
-                                                    ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR)
+                      transform=transforms.Compose([
+                                                     transforms.RandomHorizontalFlip()
+                                                    ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR, expand=False)
+                                                    ,transforms.RandomResizedCrop(input_size,scale=(.5, 0.8))
                                                     , transforms.ToTensor()
                                                     #,transforms.Normalize(mean=mean_v, std=std_v)
                                                     ])),
