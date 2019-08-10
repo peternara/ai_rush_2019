@@ -103,7 +103,7 @@ def train_dataloader(input_size=128,
                       transform=transforms.Compose([
                                                      transforms.RandomHorizontalFlip()
                                                     ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR, expand=False)
-                                                    ,transforms.RandomResizedCrop(input_size,scale=(.5, 0.8))
+                                                    ,transforms.RandomResizedCrop(input_size,scale=(.5, 0.8), ratio=(0.33,3))
                                                     , transforms.ToTensor()
                                                     #,transforms.Normalize(mean=mean_v, std=std_v)
                                                     ])),
