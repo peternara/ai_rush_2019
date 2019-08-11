@@ -12,26 +12,28 @@ import pandas as pd
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from dataloader import train_dataloader
-from dataloader import AIRushDataset
+from dataloader import AIRushDataset, ObjROI
 from cnn_finetune import make_model
 from efficientnet_pytorch import EfficientNet
 from torchsummary import summary
+import PIL
 
 
 # hyper param setting
 use_train_time_multi_calss_info_add = True  # default is True
 test_bs = False # search batch size when debugging , default is False
 use_pretrained = True # test model, no download , default is True
-
-re_train_info = {'session':'team_27/airush1/281', 'checkpoint':'9'}  #= None
+re_train_info = {'session':'team_27/airush1/296', 'checkpoint':'6'}  #= None
 # {'session':'team_27/airush1/262', 'checkpoint':'1'} # = None   #se_resnext50_32x4d
 
 
 if re_train_info is not None:
     use_pretrained = False
 
-down_lr_step = 3
+down_lr_step = 1
 start_lr = 0.001
+accum_size = 30
+use_last_fine_tune = True
 
 pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':160}  #0
                           ,{'model':'inceptionresnetv2', 'batch_size':130} #1
@@ -44,6 +46,7 @@ model_name = pre_trained_model_list[select_model_num]['model']
 
 mean_v = [0.8674, 0.8422, 0.8218]
 std_v = [0.2407, 0.2601, 0.2791]
+
 
 
 def to_np(t):
@@ -77,7 +80,8 @@ def bind_model(model_nsml):
         
         dataloader = DataLoader(
                         AIRushDataset(test_image_data_path, test_meta_data, label=None,
-                                      transform=transforms.Compose([transforms.Resize((input_size, input_size))
+                                      transform=transforms.Compose([ObjROI()
+                                          ,transforms.Resize((input_size, input_size))
                                                                     , transforms.ToTensor()
                                                                     #,transforms.Normalize(mean=mean_v, std=std_v)
                                                                     ])),
@@ -181,8 +185,9 @@ if __name__ == '__main__':
             scheduler.step()
             print('Epoch:', epoch_idx,'LR:', scheduler.get_lr())
             model.train()
+
+            optimizer.zero_grad()
             for batch_idx, (image, tags) in enumerate(dataloader):
-                optimizer.zero_grad()
                 #print('image.shape',image.shape,'tags.shape',tags.shape)
                 image = image.to(device)                
                 if use_train_time_multi_calss_info_add ==True:
@@ -191,12 +196,13 @@ if __name__ == '__main__':
                 else:
                     tags = tags.to(device)
 
-
                 output = model(image).double()
                 #print('output.shape',output.shape)
                 loss = criterion(output, tags) + criterion1(output, tags_m) #train time support
                 loss.backward()
-                optimizer.step()
+                if (batch_idx+1)%accum_size == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
 
                 output_prob = F.softmax(output, dim=1)
                 predict_vector = np.argmax(to_np(output_prob), axis=1)

@@ -35,7 +35,7 @@ def data_generator_for_keras(input_size=128,
 def train_dataloader(input_size=128,
                     batch_size=64,
                     num_workers=0,
-                    use_only_single = False, test_bs = False, br_multi_oh= False, print_nor_info = False):
+                    use_only_single = False, test_bs = False, br_multi_oh= False, print_nor_info = False, use_last_fine_tune = False):
     
     image_dir = os.path.join(DATASET_PATH, 'train', 'train_data', 'images') 
     train_label_path = os.path.join(DATASET_PATH, 'train', 'train_label') 
@@ -98,32 +98,92 @@ def train_dataloader(input_size=128,
         valid_label = valid_label[:batch_size]
 
 
-    dataloader = DataLoader(
-        AIRushDataset(image_dir, train_df, label=train_label, br_multi_oh =br_multi_oh,
-                      transform=transforms.Compose([
-                                                     transforms.RandomHorizontalFlip()
-                                                    ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR, expand=False)
-                                                    ,transforms.RandomResizedCrop(input_size,scale=(.5, 0.8), ratio=(0.33,3))
-                                                    , transforms.ToTensor()
-                                                    #,transforms.Normalize(mean=mean_v, std=std_v)
-                                                    ])),
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True)
+    if use_last_fine_tune == False:
+        dataloader = DataLoader(
+            AIRushDataset(image_dir, train_df, label=train_label, br_multi_oh =br_multi_oh,
+                          transform=transforms.Compose([
+                                                         transforms.RandomHorizontalFlip()
+                                                        ,transforms.RandomRotation(20, resample=PIL.Image.BILINEAR, expand=False)
+                                                        ,transforms.RandomResizedCrop(input_size,scale=(.5, 0.8), ratio=(0.33,3))
+                                                        , transforms.ToTensor()
+                                                        #,transforms.Normalize(mean=mean_v, std=std_v)
+                                                        ])),
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=True)
 
-    valid_dataloader = DataLoader(
-        AIRushDataset(image_dir, valid_df, label=valid_label, 
-                      transform=transforms.Compose([transforms.Resize((input_size, input_size))
-                                                    , transforms.ToTensor()
-                                                    #,transforms.Normalize(mean=mean_v, std=std_v)
-                                                    ])),
-        batch_size=batch_size//10,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=True)
+        valid_dataloader = DataLoader(
+            AIRushDataset(image_dir, valid_df, label=valid_label, 
+                          transform=transforms.Compose([transforms.Resize((input_size, input_size))
+                                                        , transforms.ToTensor()
+                                                        #,transforms.Normalize(mean=mean_v, std=std_v)
+                                                        ])),
+            batch_size=batch_size//10,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=True)
+    else:
+        dataloader = DataLoader(
+            AIRushDataset(image_dir, train_df, label=train_label, br_multi_oh =br_multi_oh,
+                                      transform=transforms.Compose([ObjROI()
+                                          ,transforms.Resize((input_size, input_size))
+                                                                    , transforms.ToTensor()
+                                                        #,transforms.Normalize(mean=mean_v, std=std_v)
+                                                        ])),
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=True)
+
+        valid_dataloader = DataLoader(
+            AIRushDataset(image_dir, valid_df, label=valid_label, 
+                                      transform=transforms.Compose([ObjROI()
+                                          ,transforms.Resize((input_size, input_size))
+                                                                    , transforms.ToTensor()
+                                                        #,transforms.Normalize(mean=mean_v, std=std_v)
+                                                        ])),
+            batch_size=batch_size//10,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=True)
+
+
     return dataloader, valid_dataloader
 
+
+class ObjROI(object):
+  def __call__(self, img):
+    img_np = np.array(img)
+    profile_x = img_np.mean(axis=(0,2))
+    profile_y = img_np.mean(axis=(1,2))
+    sx= 0
+    ex=img.width
+    sy=0
+    ey=img.height
+
+    for idx, pv in enumerate(profile_x):
+      if pv < 255.0:
+        sx = idx
+        break
+
+    for idx, pv in enumerate(profile_y):
+      if pv < 255.0:
+        sy = idx
+        break
+
+    for i in range(len(profile_x)):
+      idx  = len(profile_x) -i -1
+      if profile_x[idx] <255.0:
+        ex = idx
+        break
+
+    for i in range(len(profile_y)):
+      idx  = len(profile_y) -i -1
+      if profile_y[idx] <255.0:
+        ey = idx
+        break
+    return PIL.Image.fromarray(img_np[sy:ey,sx:ex,:])
 
 class AIRushDataset(Dataset):
     def __init__(self, image_data_path, meta_data,label=None, transform=None, use_multi=False, br_multi_oh=False):
