@@ -31,9 +31,10 @@ if re_train_info is not None:
     use_pretrained = False
 
 down_lr_step = 1
-start_lr = 0.001
+start_lr = 0.0001
 accum_size = 30
 use_last_fine_tune = True
+val_step = 1000
 
 pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':160}  #0
                           ,{'model':'inceptionresnetv2', 'batch_size':130} #1
@@ -133,6 +134,9 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
 
+
+
+
     torch.manual_seed(args.seed)
     device = args.device
 
@@ -170,13 +174,39 @@ if __name__ == '__main__':
         # Warning: Do not load data before this line
         dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size, args.num_workers, test_bs =  test_bs
                                                         , br_multi_oh=use_train_time_multi_calss_info_add#)
-                                                        ,print_nor_info = False)
+                                                        ,print_nor_info = False,use_last_fine_tune=use_last_fine_tune)
+
+        def validation(val_step_num):
+            total_valid_correct = 0
+            model.eval()
+            for batch_idx, (image, tags) in enumerate(valid_dataloader):
+                image = image.to(device)
+                tags = tags.to(device)
+                output = model(image).double()
+                output_prob = F.softmax(output, dim=1)
+                predict_vector = np.argmax(to_np(output_prob), axis=1)
+                label_vector = to_np(tags)
+                bool_vector = predict_vector == label_vector
+                accuracy = bool_vector.sum() / len(bool_vector)
+                total_valid_correct += bool_vector.sum()
+            model.train()
+            nsml.save(val_step_num)
+            print('val_step_num {} : Valid_Acc {:2.4f}'.format(val_step_num,
+                                                           total_valid_correct/len(valid_dataloader.dataset)))
+            nsml.report(
+                summary=True,
+                step=val_step_num,
+                scope=locals(),
+                **{
+                "valid__Accuracy": total_valid_correct/len(valid_dataloader.dataset),
+                })
 
 
         scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer,	
                               step_size=down_lr_step,	
                               gamma=0.5)
 
+        cnt_fwd = 0
         for epoch_idx in range(1, args.epochs + 1):
             total_loss = 0
             total_correct = 0
@@ -188,6 +218,10 @@ if __name__ == '__main__':
 
             optimizer.zero_grad()
             for batch_idx, (image, tags) in enumerate(dataloader):
+                if cnt_fwd%val_step ==0:
+                    validation(cnt_fwd//val_step)
+                    cnt_fwd+=1
+
                 #print('image.shape',image.shape,'tags.shape',tags.shape)
                 image = image.to(device)                
                 if use_train_time_multi_calss_info_add ==True:
@@ -219,37 +253,37 @@ if __name__ == '__main__':
                 total_correct += bool_vector.sum()
 
             ## validation
-            model.eval()
-            for batch_idx, (image, tags) in enumerate(valid_dataloader):
-                image = image.to(device)
+            #model.eval()
+            #for batch_idx, (image, tags) in enumerate(valid_dataloader):
+            #    image = image.to(device)
 
-                tags = tags.to(device)
-                output = model(image).double()
-                loss = criterion(output, tags)
-                output_prob = F.softmax(output, dim=1)
-                predict_vector = np.argmax(to_np(output_prob), axis=1)
-                label_vector = to_np(tags)
-                bool_vector = predict_vector == label_vector
-                accuracy = bool_vector.sum() / len(bool_vector)
-                total_valid_loss += loss.item()
-                total_valid_correct += bool_vector.sum()
+            #    tags = tags.to(device)
+            #    output = model(image).double()
+            #    loss = criterion(output, tags)
+            #    output_prob = F.softmax(output, dim=1)
+            #    predict_vector = np.argmax(to_np(output_prob), axis=1)
+            #    label_vector = to_np(tags)
+            #    bool_vector = predict_vector == label_vector
+            #    accuracy = bool_vector.sum() / len(bool_vector)
+            #    total_valid_loss += loss.item()
+            #    total_valid_correct += bool_vector.sum()
 
 
                     
-            nsml.save(epoch_idx)
-            print('Epoch {} / {}: Loss {:2.4f} / Acc {:2.4f}, Valid_Loss {:2.4f} / Valid_Acc {:2.4f}'.format(epoch_idx,
-                                                           args.epochs,
-                                                           total_loss/len(dataloader.dataset),
-                                                           total_correct/len(dataloader.dataset),
-                                                           total_valid_loss/len(valid_dataloader.dataset),
-                                                           total_valid_correct/len(valid_dataloader.dataset)))
-            nsml.report(
-                summary=True,
-                step=epoch_idx,
-                scope=locals(),
-                **{
-                "train__Loss": total_loss/len(dataloader.dataset),
-                "train__Accuracy": total_correct/len(dataloader.dataset),
-                "valid__Loss": total_valid_loss/len(valid_dataloader.dataset),
-                "valid__Accuracy": total_valid_correct/len(valid_dataloader.dataset),
-                })
+            #nsml.save(epoch_idx)
+            #print('Epoch {} / {}: Loss {:2.4f} / Acc {:2.4f}, Valid_Loss {:2.4f} / Valid_Acc {:2.4f}'.format(epoch_idx,
+            #                                               args.epochs,
+            #                                               total_loss/len(dataloader.dataset),
+            #                                               total_correct/len(dataloader.dataset),
+            #                                               total_valid_loss/len(valid_dataloader.dataset),
+            #                                               total_valid_correct/len(valid_dataloader.dataset)))
+            #nsml.report(
+            #    summary=True,
+            #    step=epoch_idx,
+            #    scope=locals(),
+            #    **{
+            #    "train__Loss": total_loss/len(dataloader.dataset),
+            #    "train__Accuracy": total_correct/len(dataloader.dataset),
+            #    "valid__Loss": total_valid_loss/len(valid_dataloader.dataset),
+            #    "valid__Accuracy": total_valid_correct/len(valid_dataloader.dataset),
+            #    })
