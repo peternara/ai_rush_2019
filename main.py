@@ -21,26 +21,27 @@ import PIL
 
 # hyper param setting
 use_train_time_multi_calss_info_add = True  # default is True
-test_bs = False # search batch size when debugging , default is False
+test_bs = True # search batch size when debugging , default is False
 use_pretrained = True # test model, no download , default is True
-re_train_info = {'session':'team_27/airush1/296', 'checkpoint':'6'}  #= None
+re_train_info = None# {'session':'team_27/airush1/296', 'checkpoint':'6'}  #= None
 # {'session':'team_27/airush1/262', 'checkpoint':'1'} # = None   #se_resnext50_32x4d
 
 
 if re_train_info is not None:
     use_pretrained = False
 
-down_lr_step = 1
-start_lr = 0.0001
-accum_size = 30
-use_last_fine_tune = True
+down_lr_step = 2
+start_lr = 0.001
+accum_size = 1#30
+use_last_fine_tune = False #True
 val_step = 1000
 
 pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':160}  #0
                           ,{'model':'inceptionresnetv2', 'batch_size':130} #1
                           ,{'model':'nasnetamobile', 'batch_size':200} #2
-                          ,{'model':'efficientnet-b4', 'batch_size':70}] 
-select_model_num = 3
+                          ,{'model':'efficientnet-b4', 'batch_size':70} #3
+                          ,{'model':'efficientnet-b5', 'batch_size':60}] #4
+select_model_num = 4
 _BATCH_SIZE = pre_trained_model_list[select_model_num]['batch_size']
 model_name = pre_trained_model_list[select_model_num]['model']
 
