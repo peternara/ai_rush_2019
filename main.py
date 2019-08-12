@@ -24,7 +24,8 @@ use_train_time_multi_calss_info_add = True  # default is True
 test_bs = False # search batch size when debugging , default is False
 use_pretrained = True # test model, no download , default is True
 
-re_train_info =    {'session':'team_27/airush1/262', 'checkpoint':'1'}
+re_train_info =   {'session':'team_27/airush1/326', 'checkpoint':'28'}# None #'efficientnet-b4' 
+#{'session':'team_27/airush1/262', 'checkpoint':'1'} #se_resnext50_32x4d
 #{'session':'team_27/airush1/325', 'checkpoint':'19'}# None #'efficientnet-b5'
 #{'session':'team_27/airush1/326', 'checkpoint':'28'}# None #'efficientnet-b4'
 # {'session':'team_27/airush1/296', 'checkpoint':'6'}  #= None
@@ -37,18 +38,15 @@ down_lr_step = 1
 start_lr = 0.0002
 accum_size = 30
 use_last_fine_tune = True #True
-val_step = 2000
+val_step = 1000
 
-use_ensemble_model_sel = [3,0]
-use_ensemble_model_session = [{'session':'team_27/airush1/326', 'checkpoint':'28'} #'efficientnet-b4'
-                              , {'session':'team_27/airush1/262', 'checkpoint':'1'}] #se_resnext50_32x4d
 
 pre_trained_model_list = [{'model':'se_resnext50_32x4d', 'batch_size':160}  #0
                           ,{'model':'inceptionresnetv2', 'batch_size':130} #1
                           ,{'model':'nasnetamobile', 'batch_size':200} #2
                           ,{'model':'efficientnet-b4', 'batch_size':70} #3
                           ,{'model':'efficientnet-b5', 'batch_size':50}] #4
-select_model_num = 0
+select_model_num = 3
 _BATCH_SIZE = pre_trained_model_list[select_model_num]['batch_size']
 model_name = pre_trained_model_list[select_model_num]['model']
 
