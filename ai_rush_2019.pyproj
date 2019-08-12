@@ -24,6 +24,9 @@
   <ItemGroup>
     <Compile Include="ai_rush_2019.py" />
     <Compile Include="dataloader.py" />
+    <Compile Include="ensemble.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="keras_main.py">
       <SubType>Code</SubType>
     </Compile>
