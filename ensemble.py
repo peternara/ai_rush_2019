@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
 
     use_ensemble_model_session = [{'session':'team_27/airush1/372', 'checkpoint':'0'} #'efficientnet-b4'
-                                  , {'session':'team_27/airush1/354', 'checkpoint':'5'}] #se_resnext50_32x4d
+                                  , {'session':'team_27/airush1/354', 'checkpoint':'8'}] #se_resnext50_32x4d
 
     modelA = EfficientNet.from_name('efficientnet-b4', override_params={'num_classes': args.output_size})
     modelB = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=False, pool=nn.AdaptiveAvgPool2d(1))
@@ -168,7 +168,7 @@ if __name__ == '__main__':
 
                 image_lr = image.flip(3) #batch, ch, h, w
                 cat_tensor = torch.cat((image, image_lr))
-                output_cat = model_nsml(cat_tensor).double()
+                output_cat = model(cat_tensor).double()
             
                 output_org = output_cat[:batch_size,:]
                 ouput_lr = output_cat[batch_size:,:]
