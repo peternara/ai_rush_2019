@@ -262,3 +262,4 @@ if __name__ == '__main__':
                                                                              accuracy))
                 total_loss += loss.item()
                 total_correct += bool_vector.sum()
+
