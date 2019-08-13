@@ -90,7 +90,7 @@ def train_dataloader(input_size=128,
 
 
     print("batch_size : ", batch_size)
-
+    print("valid_batch_size : ",batch_size//10)
     if test_bs ==True:
         train_df = train_df.head(batch_size)
         valid_df = valid_df.head(batch_size)

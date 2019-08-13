@@ -17,21 +17,29 @@ from cnn_finetune import make_model
 from efficientnet_pytorch import EfficientNet
 from torchsummary import summary
 import PIL
+from bn_fusion import fuse_bn_recursively
+_BATCH_SIZE = 11
 
-_BATCH_SIZE = 24
-
-class MyEnsemble(nn.Module):
-    def __init__(self, modelA, modelB, Ar=0.5, Br=0.5):
-        super(MyEnsemble, self).__init__()
+class MyEnsembleTTA(nn.Module):
+    def __init__(self, modelA, modelB, modelC, Ar=0.5, Br=0.4, Cr=0.1):
+        super(MyEnsembleTTA, self).__init__()
         self.modelA = modelA
         self.modelB = modelB
-        self.Ar = Ar
-        self.Br = Br
+        self.modelC = modelC
+        self.Ar = Ar/2
+        self.Br = Br/2
+        self.Cr = Cr/2
         
     def forward(self, x):
+        x_lr =  x.flip(3)
         xa = self.modelA(x)
         xb = self.modelB(x)
-        return xa*self.Ar+xb*self.Br
+        xc = self.modelC(x)
+        xa_lr = self.modelA(x_lr)
+        xb_lr = self.modelB(x_lr)
+        xc_lr = self.modelC(x_lr)
+
+        return xa*self.Ar+xb*self.Br+xc*self.Cr + xa_lr*self.Ar+xb_lr*self.Br+xc_lr*self.Cr
 
 def to_np(t):
     return t.cpu().detach().numpy()
@@ -58,7 +66,7 @@ def bind_model(model_nsml):
         test_meta_data = pd.read_csv(test_meta_data_path, delimiter=',', header=0)
         
         input_size=224 # you can change this according to your model.
-        batch_size=_BATCH_SIZE//2 # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
+        batch_size=_BATCH_SIZE # you can change this. But when you use 'nsml submit --test' for test infer, there are only 200 number of data.
         # test time gpu memory error, so i reduce batch size when test time
         device = 0
         
@@ -73,23 +81,15 @@ def bind_model(model_nsml):
                         shuffle=False,
                         num_workers=3,
                         pin_memory=True)
-        
+        model_nsml = fuse_bn_recursively(model_nsml)
         model_nsml.to(device)
+
         model_nsml.eval()
         predict_list = []
         for batch_idx, image in enumerate(dataloader):
             image = image.to(device)
-            image_lr = image.flip(3) #batch, ch, h, w
 
-            cat_tensor = torch.cat((image, image_lr))
-            output_cat = model_nsml(cat_tensor).double()
-            
-            output_org = output_cat[:batch_size,:]
-            ouput_lr = output_cat[batch_size:,:]
-            #output_org = model_nsml(image).double()
-            #output_lr = model_nsml(image_lr).double()
-            output = output_org + output_lr
-
+            output = model_nsml(image).double()
             output_prob = F.softmax(output, dim=1)
             predict = np.argmax(to_np(output_prob), axis=1)
 
@@ -130,11 +130,12 @@ if __name__ == '__main__':
 
 
     use_ensemble_model_session = [{'session':'team_27/airush1/372', 'checkpoint':'0'} #'efficientnet-b4'
-                                  , {'session':'team_27/airush1/354', 'checkpoint':'8'}] #se_resnext50_32x4d
+                                  , {'session':'team_27/airush1/354', 'checkpoint':'8'} #se_resnext50_32x4d
+                                  ,{'session':'team_27/airush1/377', 'checkpoint':'8'} ]#'nasnetamobile'
 
     modelA = EfficientNet.from_name('efficientnet-b4', override_params={'num_classes': args.output_size})
     modelB = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=False, pool=nn.AdaptiveAvgPool2d(1))
-    
+    modelC = make_model('nasnetamobile', num_classes=args.output_size, pretrained=False, pool=nn.AdaptiveAvgPool2d(1))
     # DONOTCHANGE: They are reserved for nsml
     bind_model(modelA)
     re_train_info = use_ensemble_model_session[0]#'efficientnet-b4'
@@ -142,9 +143,12 @@ if __name__ == '__main__':
     bind_model(modelB)
     re_train_info = use_ensemble_model_session[1]#'se_resnext50_32x4d'
     nsml.load(checkpoint=re_train_info['checkpoint'], session=re_train_info['session']) 
+    bind_model(modelC)
+    re_train_info = use_ensemble_model_session[2]#'nasnetamobile'
+    nsml.load(checkpoint=re_train_info['checkpoint'], session=re_train_info['session']) 
 
-    model = MyEnsemble(modelA,modelB)
-
+    model = MyEnsembleTTA(modelA,modelB,modelC)
+    model = fuse_bn_recursively(model)
     model = model.to(device) #use gpu
     #summary(model, (3,args.input_size,args.input_size))
     # DONOTCHANGE: They are reserved for nsml
@@ -156,7 +160,7 @@ if __name__ == '__main__':
         nsml.paused(scope=locals())
     if args.mode == "train":
         # Warning: Do not load data before this line
-        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size*5, args.num_workers, test_bs =  False
+        dataloader, valid_dataloader = train_dataloader(args.input_size, args.batch_size*10, args.num_workers, test_bs =  False
                                                         , br_multi_oh=True#)
                                                         ,print_nor_info = False,use_last_fine_tune=True)
 
@@ -166,18 +170,8 @@ if __name__ == '__main__':
             for batch_idx, (image, tags) in enumerate(valid_dataloader):
                 image = image.to(device)
 
-                image_lr = image.flip(3) #batch, ch, h, w
-                cat_tensor = torch.cat((image, image_lr))
-                output_cat = model(cat_tensor).double()
-            
-                output_org = output_cat[:batch_size,:]
-                ouput_lr = output_cat[batch_size:,:]
-                #output_org = model_nsml(image).double()
-                #output_lr = model_nsml(image_lr).double()
-                output = output_org + output_lr
-
                 tags = tags.to(device)
-                #output = model(image).double()
+                output = model(image).double()
                 output_prob = F.softmax(output, dim=1)
                 predict_vector = np.argmax(to_np(output_prob), axis=1)
                 label_vector = to_np(tags)
@@ -199,7 +193,9 @@ if __name__ == '__main__':
         for i in range(10):
             pr = np.random.uniform(-0.2, 0.2)
             Ar = 0.5 + pr
-            Br = 1 - Ar
-            print('Ar',Ar,'Br',Br)
-            model = MyEnsemble(modelA,modelB,Ar, Br)
+            Br = 0.9 - Ar
+            Cr = 0.1
+            print('Ar',Ar,'Br',Br,'Cr',Cr)
+            model = MyEnsembleTTA(modelA,modelB,modelC, Ar, Br,Cr)
+            model = fuse_bn_recursively(model)
             validation(i)
