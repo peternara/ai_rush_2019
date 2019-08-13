@@ -8,7 +8,7 @@ import pandas as pd
 
 team_name = "team_27"       
 data_name = "airush1"     
-start_wait_sec =  60*60#35*60
+start_wait_sec =  21*60#35*60
 submit_list_path  = './submit_list_cand.csv'
 #airush1
 def run_submit(command):

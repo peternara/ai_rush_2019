@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>17579c53-0406-4e0f-aa69-83d5f45a43bd</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>ai_rush_2019.py</StartupFile>
+    <StartupFile>submit.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -35,8 +35,6 @@
     <Compile Include="model.py" />
     <Compile Include="setup.py" />
     <Compile Include="submit.py" />
-    <Compile Include="test_convert_inference.py" />
-    <Compile Include="utils.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".nsmlignore" />

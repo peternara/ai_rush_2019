@@ -81,9 +81,9 @@ def bind_model(model_nsml):
                         shuffle=False,
                         num_workers=3,
                         pin_memory=True)
-        model_nsml = fuse_bn_recursively(model_nsml)
-        model_nsml.to(device)
 
+        model_nsml.to(device)
+        model_nsml = fuse_bn_recursively(model_nsml)
         model_nsml.eval()
         predict_list = []
         for batch_idx, image in enumerate(dataloader):
@@ -129,9 +129,9 @@ if __name__ == '__main__':
     device = args.device
 
 
-    use_ensemble_model_session = [{'session':'team_27/airush1/372', 'checkpoint':'0'} #'efficientnet-b4'
-                                  , {'session':'team_27/airush1/354', 'checkpoint':'8'} #se_resnext50_32x4d
-                                  ,{'session':'team_27/airush1/377', 'checkpoint':'8'} ]#'nasnetamobile'
+    use_ensemble_model_session = [{'session':'team_27/airush1/372', 'checkpoint':'1'} #'efficientnet-b4'
+                                  , {'session':'team_27/airush1/354', 'checkpoint':'9'} #se_resnext50_32x4d
+                                  ,{'session':'team_27/airush1/377', 'checkpoint':'14'} ]#'nasnetamobile'
 
     modelA = EfficientNet.from_name('efficientnet-b4', override_params={'num_classes': args.output_size})
     modelB = make_model('se_resnext50_32x4d', num_classes=args.output_size, pretrained=False, pool=nn.AdaptiveAvgPool2d(1))
@@ -153,7 +153,8 @@ if __name__ == '__main__':
     #summary(model, (3,args.input_size,args.input_size))
     # DONOTCHANGE: They are reserved for nsml
     bind_model(model)
-    nsml.save('dontgiveup')
+    #nsml.load(checkpoint='3', session='team_27/airush1/392 ') 
+    #nsml.save('dontgiveup')
 
 
     if args.pause:
@@ -191,10 +192,14 @@ if __name__ == '__main__':
 
 
         for i in range(10):
-            pr = np.random.uniform(-0.2, 0.2)
-            Ar = 0.5 + pr
-            Br = 0.9 - Ar
-            Cr = 0.1
+            Ar = np.random.uniform(0.0, 1.0) *1.3
+            Br = np.random.uniform(0.0, 1.0) * 1.2
+            Cr = np.random.uniform(0.0, 1.0)
+            sum = Ar+Br+Cr
+            Ar /=sum
+            Br /=sum
+            Cr /=sum
+
             print('Ar',Ar,'Br',Br,'Cr',Cr)
             model = MyEnsembleTTA(modelA,modelB,modelC, Ar, Br,Cr)
             model = fuse_bn_recursively(model)
